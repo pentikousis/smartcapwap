@@ -1,6 +1,10 @@
 #ifndef __CAPWAP_ELEMENT_HEADER__
 #define __CAPWAP_ELEMENT_HEADER__
 
+#include <urcu.h>               /* Userspace RCU flavor */
+#include <urcu/rculist.h>       /* RCU list */
+#include <urcu/compiler.h>      /* For CAA_ARRAY_SIZE */
+
 #include "capwap_array.h"
 #include "capwap_list.h"
 

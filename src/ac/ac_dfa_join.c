@@ -41,6 +41,8 @@ static struct ac_soap_response* ac_dfa_state_join_parsing_request(struct ac_sess
 	struct capwap_location_element* location;
 	struct capwap_wtpboarddata_element* wtpboarddata;
 	struct capwap_wtpdescriptor_element* wtpdescriptor;
+	struct capwap_wtpdescriptor_encrypt_subelement *wtpdescriptor_encrypt;
+	struct capwap_wtpdescriptor_desc_subelement *wtpdescriptor_desc;
 	struct capwap_wtpname_element* wtpname;
 	struct capwap_wtpframetunnelmode_element* wtpframetunnelmode;
 	struct capwap_wtpmactype_element* wtpmactype;
@@ -178,9 +180,8 @@ static struct ac_soap_response* ac_dfa_state_join_parsing_request(struct ac_sess
 	json_object_object_add(jsonhash, "RadiosInUse", json_object_new_int((int)wtpdescriptor->radiosinuse));
 
 	jsonarray = json_object_new_array();
-	for (i = 0; i < wtpdescriptor->encryptsubelement->count; i++) {
+	cds_list_for_each_entry(wtpdescriptor_encrypt, &wtpdescriptor->encryptsubelement, node) {
 		struct json_object* jsonencrypt;
-		struct capwap_wtpdescriptor_encrypt_subelement* wtpdescriptor_encrypt = (struct capwap_wtpdescriptor_encrypt_subelement*)capwap_array_get_item_pointer(wtpdescriptor->encryptsubelement, i);
 
 		jsonencrypt = json_object_new_object();
 		json_object_object_add(jsonencrypt, "WBID", json_object_new_int((int)wtpdescriptor_encrypt->wbid));
@@ -191,9 +192,8 @@ static struct ac_soap_response* ac_dfa_state_join_parsing_request(struct ac_sess
 	json_object_object_add(jsonhash, "EncryptionSubElement", jsonarray);
 
 	jsonarray = json_object_new_array();
-	for (i = 0; i < wtpdescriptor->descsubelement->count; i++) {
+	cds_list_for_each_entry(wtpdescriptor_desc, &wtpdescriptor->descsubelement, node) {
 		struct json_object* jsondesc;
-		struct capwap_wtpdescriptor_desc_subelement* wtpdescriptor_desc = (struct capwap_wtpdescriptor_desc_subelement*)capwap_array_get_item_pointer(wtpdescriptor->descsubelement, i);
 
 		jsondesc = json_object_new_object();
 		json_object_object_add(jsondesc, "DescriptorVendorIdentifier", json_object_new_int((int)wtpdescriptor_desc->vendor));

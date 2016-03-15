@@ -196,6 +196,13 @@ if test "${enable_ac}" = "yes"; then
 	)
 fi
 
+PKG_CHECK_MODULES(
+	[LIBURCU],
+	[liburcu >= 0.9],
+	[],
+	[AC_MSG_ERROR(You need the Userspace RCU library)]
+)
+
 # Check Netlink library
 PKG_CHECK_MODULES(
 	[LIBNL3],

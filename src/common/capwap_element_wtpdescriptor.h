@@ -9,13 +9,15 @@
 struct capwap_wtpdescriptor_element {
 	uint8_t maxradios;
 	uint8_t radiosinuse;
-	struct capwap_array* encryptsubelement;
-	struct capwap_array* descsubelement;
+	struct cds_list_head encryptsubelement;
+	struct cds_list_head descsubelement;
 };
 
 #define CAPWAP_WTPDESC_SUBELEMENT_WBID_MASK					0x1f
 
 struct capwap_wtpdescriptor_encrypt_subelement {
+	struct cds_list_head node;
+
 	uint8_t wbid;
 	uint16_t capabilities;
 };
@@ -30,6 +32,8 @@ struct capwap_wtpdescriptor_encrypt_subelement {
 #define CAPWAP_WTPDESC_SUBELEMENT_MAXDATA					1024
 
 struct capwap_wtpdescriptor_desc_subelement {
+	struct cds_list_head node;
+
 	uint32_t vendor;
 	uint16_t type;
 	uint8_t* data;

@@ -51,9 +51,9 @@ static int wtp_init(void) {
 
 	/* Standard configuration */
 	g_wtp.boarddata.boardsubelement = capwap_array_create(sizeof(struct capwap_wtpboarddata_board_subelement), 0, 1);
-	g_wtp.descriptor.encryptsubelement = capwap_array_create(sizeof(struct capwap_wtpdescriptor_encrypt_subelement), 0, 0);
-	g_wtp.descriptor.descsubelement = capwap_array_create(sizeof(struct capwap_wtpdescriptor_desc_subelement), 0, 1);
-	
+	CDS_INIT_LIST_HEAD(&g_wtp.descriptor.encryptsubelement);
+	CDS_INIT_LIST_HEAD(&g_wtp.descriptor.descsubelement);
+
 	g_wtp.binding = CAPWAP_WIRELESS_BINDING_NONE;
 
 	g_wtp.ecn.flag = CAPWAP_LIMITED_ECN_SUPPORT;
@@ -86,21 +86,26 @@ static int wtp_init(void) {
 }
 
 /* Destroy WTP */
-static void wtp_destroy(void) {
+static void wtp_destroy(void)
+{
 	int i;
+	struct capwap_wtpdescriptor_encrypt_subelement *enc, *e;
+	struct capwap_wtpdescriptor_desc_subelement *desc, *d;
 
 	/* Dtls */
 	capwap_crypt_freecontext(&g_wtp.dtlscontext);
 
 	/* Free standard configuration */
-	capwap_array_free(g_wtp.descriptor.encryptsubelement);
+	cds_list_for_each_entry_safe(enc, e, &g_wtp.descriptor.encryptsubelement, node) {
+		cds_list_del(&enc->node);
+		capwap_free(enc);
+	}
 
-	for (i = 0; i < g_wtp.descriptor.descsubelement->count; i++) {
-		struct capwap_wtpdescriptor_desc_subelement* element = (struct capwap_wtpdescriptor_desc_subelement*)capwap_array_get_item_pointer(g_wtp.descriptor.descsubelement, i);
-
-		if (element->data) {
-			capwap_free(element->data);
-		}
+	cds_list_for_each_entry_safe(desc, d, &g_wtp.descriptor.descsubelement, node) {
+		cds_list_del(&desc->node);
+		if (desc->data)
+			capwap_free(desc->data);
+		capwap_free(desc);
 	}
 
 	for (i = 0; i < g_wtp.boarddata.boardsubelement->count; i++) {
@@ -111,7 +116,6 @@ static void wtp_destroy(void) {
 		}
 	}
 
-	capwap_array_free(g_wtp.descriptor.descsubelement);
 	capwap_array_free(g_wtp.boarddata.boardsubelement);
 
 	/* Free fragments packet */
@@ -798,10 +802,12 @@ static int wtp_parsing_cfg_descriptor_info(config_t *config)
 			return 0;
 		}
 
-		desc = (struct capwap_wtpdescriptor_desc_subelement*)capwap_array_get_item_pointer(g_wtp.descriptor.descsubelement, g_wtp.descriptor.descsubelement->count);
+		desc = capwap_alloc(sizeof(struct capwap_wtpdescriptor_desc_subelement));
 		desc->vendor = (unsigned long)configVendor;
 		desc->type = type;
 		desc->data = (uint8_t*)capwap_duplicate_string(configValue);
+
+		cds_list_add_tail(&desc->node, &g_wtp.descriptor.descsubelement);
 	}
 
 	return 1;
@@ -1011,9 +1017,11 @@ static int wtp_parsing_configuration_1_0(config_t* config) {
 		}
 
 		/* */
-		encrypt = (struct capwap_wtpdescriptor_encrypt_subelement*)capwap_array_get_item_pointer(g_wtp.descriptor.encryptsubelement, g_wtp.descriptor.encryptsubelement->count);
+		encrypt = capwap_alloc(sizeof(struct capwap_wtpdescriptor_encrypt_subelement));
 		encrypt->wbid = g_wtp.binding;
 		encrypt->capabilities = capability;
+
+		cds_list_add_tail(&encrypt->node, &g_wtp.descriptor.encryptsubelement);
 	} else {
 		capwap_logging_error("Invalid configuration file, application.descriptor.encryption not found");
 		return 0;

@@ -72,18 +72,13 @@ static void capwap_wtpdescriptor_element_create(void *data,
 
 	/* */
 	cds_list_for_each_entry(desc, &element->descsubelement, node) {
-		uint16_t length;
-
 		ASSERT((desc->type >= CAPWAP_WTPDESC_SUBELEMENT_TYPE_FIRST) &&
 		       (desc->type <= CAPWAP_WTPDESC_SUBELEMENT_TYPE_LAST));
 
-		length = strlen((char*)desc->data);
-		ASSERT(length > 0);
-
 		func->write_u32(handle, desc->vendor);
 		func->write_u16(handle, desc->type);
-		func->write_u16(handle, length);
-		func->write_block(handle, desc->data, length);
+		func->write_u16(handle, desc->length);
+		func->write_block(handle, desc->data, desc->length);
 	}
 }
 
@@ -105,18 +100,14 @@ static void* capwap_wtpdescriptor_element_clone(void *data)
 	cds_list_for_each_entry(enc, &element->encryptsubelement, node) {
 		struct capwap_wtpdescriptor_encrypt_subelement *clone;
 
-		clone = capwap_alloc(sizeof(struct capwap_wtpdescriptor_encrypt_subelement));
-		memcpy(clone, enc, sizeof(struct capwap_wtpdescriptor_encrypt_subelement));
+		clone = capwap_clone(enc, sizeof(struct capwap_wtpdescriptor_encrypt_subelement));
 		cds_list_add_tail(&clone->node, &cloneelement->encryptsubelement);
 	}
 
 	cds_list_for_each_entry(desc, &element->descsubelement, node) {
 		struct capwap_wtpdescriptor_desc_subelement *clone;
 
-		clone = capwap_alloc(sizeof(struct capwap_wtpdescriptor_desc_subelement));
-		memcpy(clone, desc, sizeof(struct capwap_wtpdescriptor_desc_subelement));
-		if (desc->data)
-			clone->data = (uint8_t*)capwap_duplicate_string((char*)desc->data);
+		clone = capwap_clone(desc, sizeof(struct capwap_wtpdescriptor_desc_subelement) + desc->length);
 		cds_list_add_tail(&clone->node, &cloneelement->descsubelement);
 	}
 
@@ -140,8 +131,6 @@ static void capwap_wtpdescriptor_element_free(void *data)
 
 	cds_list_for_each_entry_safe(desc, d, &element->descsubelement, node) {
 		cds_list_del(&desc->node);
-		if (desc->data)
-			capwap_free(desc->data);
 		capwap_free(desc);
 	}
 
@@ -212,8 +201,9 @@ static void *capwap_wtpdescriptor_element_parsing(capwap_message_elements_handle
 
 	/* WTP Description Subelement */
 	while (func->read_ready(handle) > 0) {
-		unsigned short length;
-		uint16_t lengthdesc;
+		uint32_t vendor;
+		uint16_t type;
+		uint16_t length;
 		struct capwap_wtpdescriptor_desc_subelement* desc;
 
 		/* Check */
@@ -224,31 +214,33 @@ static void *capwap_wtpdescriptor_element_parsing(capwap_message_elements_handle
 		}
 
 		/* */
-		desc = capwap_alloc(sizeof(struct capwap_wtpdescriptor_desc_subelement));
-		func->read_u32(handle, &desc->vendor);
-		func->read_u16(handle, &desc->type);
-		func->read_u16(handle, &lengthdesc);
+		func->read_u32(handle, &vendor);
+		func->read_u16(handle, &type);
+		func->read_u16(handle, &length);
 
-		cds_list_add_tail(&desc->node, &data->descsubelement);
-
-		if ((desc->type < CAPWAP_WTPDESC_SUBELEMENT_TYPE_FIRST) ||
-		    (desc->type > CAPWAP_WTPDESC_SUBELEMENT_TYPE_LAST)) {
+		if (type < CAPWAP_WTPDESC_SUBELEMENT_TYPE_FIRST ||
+		    type > CAPWAP_WTPDESC_SUBELEMENT_TYPE_LAST) {
 			capwap_logging_debug("Invalid WTP Descriptor subelement: invalid type");
 			capwap_wtpdescriptor_element_free(data);
 			return NULL;
 		}
 
 		/* Check buffer size */
-		length = func->read_ready(handle);
-		if (!length || (length > CAPWAP_WTPDESC_SUBELEMENT_MAXDATA) || (length < lengthdesc)) {
+		if (!length ||
+		    length > CAPWAP_WTPDESC_SUBELEMENT_MAXDATA ||
+		    length != func->read_ready(handle)) {
 			capwap_logging_debug("Invalid WTP Descriptor element");
 			capwap_wtpdescriptor_element_free(data);
 			return NULL;
 		}
 
-		desc->data = (uint8_t*)capwap_alloc(lengthdesc + 1);
-		func->read_block(handle, desc->data, lengthdesc);
-		desc->data[lengthdesc] = 0;
+		desc = capwap_alloc(sizeof(struct capwap_wtpdescriptor_desc_subelement) + length);
+		desc->vendor = vendor;
+		desc->type = type;
+		desc->length = length;
+		func->read_block(handle, desc->data, length);
+
+		cds_list_add_tail(&desc->node, &data->descsubelement);
 	}
 
 	return data;

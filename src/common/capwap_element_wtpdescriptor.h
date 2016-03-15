@@ -36,7 +36,8 @@ struct capwap_wtpdescriptor_desc_subelement {
 
 	uint32_t vendor;
 	uint16_t type;
-	uint8_t* data;
+	uint16_t length;
+	uint8_t data[];
 };
 
 extern const struct capwap_message_elements_ops capwap_element_wtpdescriptor_ops;

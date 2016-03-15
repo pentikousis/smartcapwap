@@ -103,8 +103,6 @@ static void wtp_destroy(void)
 
 	cds_list_for_each_entry_safe(desc, d, &g_wtp.descriptor.descsubelement, node) {
 		cds_list_del(&desc->node);
-		if (desc->data)
-			capwap_free(desc->data);
 		capwap_free(desc);
 	}
 
@@ -802,10 +800,11 @@ static int wtp_parsing_cfg_descriptor_info(config_t *config)
 			return 0;
 		}
 
-		desc = capwap_alloc(sizeof(struct capwap_wtpdescriptor_desc_subelement));
+		desc = capwap_alloc(sizeof(struct capwap_wtpdescriptor_desc_subelement) + strlen(configValue));
 		desc->vendor = (unsigned long)configVendor;
 		desc->type = type;
-		desc->data = (uint8_t*)capwap_duplicate_string(configValue);
+		desc->length = strlen(configValue);
+		memcpy(desc->data, configValue, desc->length);
 
 		cds_list_add_tail(&desc->node, &g_wtp.descriptor.descsubelement);
 	}

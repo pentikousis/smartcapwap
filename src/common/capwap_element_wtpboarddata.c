@@ -27,23 +27,27 @@ Length:   >=14
 ********************************************************************/
 
 /* */
-static void capwap_wtpboarddata_element_create(void* data, capwap_message_elements_handle handle, struct capwap_write_message_elements_ops* func) {
-	int i;
-	struct capwap_wtpboarddata_element* element = (struct capwap_wtpboarddata_element*)data;
+static void capwap_wtpboarddata_element_create(void *data,
+					       capwap_message_elements_handle handle,
+					       struct capwap_write_message_elements_ops *func)
+{
+	struct capwap_wtpboarddata_element *element =
+		(struct capwap_wtpboarddata_element *)data;
+	struct capwap_wtpboarddata_board_subelement* desc;
 
 	ASSERT(data != NULL);
 	ASSERT(element->vendor != 0);
-	ASSERT(element->boardsubelement->count > 0);
+	ASSERT(!cds_list_empty(&element->boardsubelement));
 
 	/* */
 	func->write_u32(handle, element->vendor);
 
 	/* */
-	for (i = 0; i < element->boardsubelement->count; i++) {
-		struct capwap_wtpboarddata_board_subelement* desc = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(element->boardsubelement, i);
-
-		ASSERT((desc->type >= CAPWAP_BOARD_SUBELEMENT_TYPE_FIRST) && (desc->type <= CAPWAP_BOARD_SUBELEMENT_TYPE_LAST));
-		ASSERT((desc->length > 0) && (desc->length <= CAPWAP_BOARD_SUBELEMENT_MAXDATA));
+	cds_list_for_each_entry(desc, &element->boardsubelement, node) {
+		ASSERT((desc->type >= CAPWAP_BOARD_SUBELEMENT_TYPE_FIRST) &&
+		       (desc->type <= CAPWAP_BOARD_SUBELEMENT_TYPE_LAST));
+		ASSERT((desc->length > 0) &&
+		       (desc->length <= CAPWAP_BOARD_SUBELEMENT_MAXDATA));
 
 		func->write_u16(handle, desc->type);
 		func->write_u16(handle, desc->length);
@@ -52,52 +56,51 @@ static void capwap_wtpboarddata_element_create(void* data, capwap_message_elemen
 }
 
 /* */
-static void* capwap_wtpboarddata_element_clone(void* data) {
-	int i;
-	struct capwap_wtpboarddata_element* cloneelement;
-	struct capwap_wtpboarddata_element* element = (struct capwap_wtpboarddata_element*)data;
+static void *capwap_wtpboarddata_element_clone(void *data)
+{
+	struct capwap_wtpboarddata_element *cloneelement;
+	struct capwap_wtpboarddata_element *element =
+		(struct capwap_wtpboarddata_element *)data;
+	struct capwap_wtpboarddata_board_subelement* desc;
 
 	ASSERT(data != NULL);
 
 	cloneelement = capwap_clone(data, sizeof(struct capwap_wtpboarddata_element));
-	cloneelement->boardsubelement = capwap_array_create(sizeof(struct capwap_wtpboarddata_board_subelement), 0, 1);
-	for (i = 0; i < element->boardsubelement->count; i++) {
-		struct capwap_wtpboarddata_board_subelement* desc = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(element->boardsubelement, i);
-		struct capwap_wtpboarddata_board_subelement* clonedesc = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(cloneelement->boardsubelement, i);
+	CDS_INIT_LIST_HEAD(&cloneelement->boardsubelement);
 
-		memcpy(clonedesc, desc, sizeof(struct capwap_wtpboarddata_board_subelement));
-		if (desc->length) {
-			clonedesc->data = capwap_clone(desc->data, desc->length);
-		}
+	cds_list_for_each_entry(desc, &element->boardsubelement, node) {
+		struct capwap_wtpboarddata_board_subelement *clone;
+
+		clone = capwap_clone(desc, sizeof(struct capwap_wtpboarddata_board_subelement) + desc->length);
+		cds_list_add_tail(&clone->node, &cloneelement->boardsubelement);
 	}
 
 	return cloneelement;
 }
 
 /* */
-static void capwap_wtpboarddata_element_free(void* data) {
-	int i;
-	struct capwap_wtpboarddata_element* element = (struct capwap_wtpboarddata_element*)data;
+static void capwap_wtpboarddata_element_free(void *data)
+{
+	struct capwap_wtpboarddata_element *element =
+		(struct capwap_wtpboarddata_element *)data;
+	struct capwap_wtpboarddata_board_subelement* desc, *d;
 
 	ASSERT(data != NULL);
-	ASSERT(element->boardsubelement != NULL);
 
 	/* */
-	for (i = 0; i < element->boardsubelement->count; i++) {
-		struct capwap_wtpboarddata_board_subelement* desc = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(element->boardsubelement, i);
-
-		if (desc->data) {
-			capwap_free(desc->data);
-		}
+	cds_list_for_each_entry_safe(desc, d, &element->boardsubelement, node) {
+		cds_list_del(&desc->node);
+		capwap_free(desc);
 	}
 
-	capwap_array_free(element->boardsubelement);
 	capwap_free(data);
 }
 
 /* */
-static void* capwap_wtpboarddata_element_parsing(capwap_message_elements_handle handle, struct capwap_read_message_elements_ops* func) {
-	struct capwap_wtpboarddata_element* data;
+static void *capwap_wtpboarddata_element_parsing(capwap_message_elements_handle handle,
+						 struct capwap_read_message_elements_ops *func)
+{
+	struct capwap_wtpboarddata_element *data;
 
 	ASSERT(handle != NULL);
 	ASSERT(func != NULL);
@@ -108,8 +111,8 @@ static void* capwap_wtpboarddata_element_parsing(capwap_message_elements_handle 
 	}
 
 	/* */
-	data = (struct capwap_wtpboarddata_element*)capwap_alloc(sizeof(struct capwap_wtpboarddata_element));
-	data->boardsubelement = capwap_array_create(sizeof(struct capwap_wtpboarddata_board_subelement), 0, 1);
+	data = (struct capwap_wtpboarddata_element *)capwap_alloc(sizeof(struct capwap_wtpboarddata_element));
+	CDS_INIT_LIST_HEAD(&data->boardsubelement);
 
 	/* Retrieve data */
 	func->read_u32(handle, &data->vendor);
@@ -121,29 +124,36 @@ static void* capwap_wtpboarddata_element_parsing(capwap_message_elements_handle 
 
 	/* WTP Board Data Subelement */
 	while (func->read_ready(handle) > 0) {
-		unsigned short length;
-		struct capwap_wtpboarddata_board_subelement* desc = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(data->boardsubelement, data->boardsubelement->count);
+		uint16_t type;
+		uint16_t length;
+		struct capwap_wtpboarddata_board_subelement *desc;
 
 		/* */
-		func->read_u16(handle, &desc->type);
-		func->read_u16(handle, &desc->length);
+		func->read_u16(handle, &type);
+		func->read_u16(handle, &length);
 
-		if ((desc->type < CAPWAP_BOARD_SUBELEMENT_TYPE_FIRST) || (desc->type > CAPWAP_BOARD_SUBELEMENT_TYPE_LAST)) {
+		if (type < CAPWAP_BOARD_SUBELEMENT_TYPE_FIRST ||
+		    type > CAPWAP_BOARD_SUBELEMENT_TYPE_LAST) {
 			capwap_logging_debug("Invalid WTP Board Data element: invalid type");
 			capwap_wtpboarddata_element_free(data);
 			return NULL;
 		}
 
 		/* Check buffer size */
-		length = func->read_ready(handle);
-		if (!length || (length > CAPWAP_BOARD_SUBELEMENT_MAXDATA) || (length < desc->length)) {
+		if (!length ||
+		    length > CAPWAP_BOARD_SUBELEMENT_MAXDATA ||
+		    length != func->read_ready(handle)) {
 			capwap_logging_debug("Invalid WTP Board Data element: invalid length");
 			capwap_wtpboarddata_element_free(data);
 			return NULL;
 		}
 
-		desc->data = (uint8_t*)capwap_alloc(desc->length);
-		func->read_block(handle, desc->data, desc->length);
+		desc = capwap_alloc(sizeof(struct capwap_wtpboarddata_board_subelement) + length);
+		desc->type = type;
+		desc->length = length;
+		func->read_block(handle, desc->data, length);
+
+		cds_list_add_tail(&desc->node, &data->boardsubelement);
 	}
 
 	return data;
@@ -159,19 +169,19 @@ const struct capwap_message_elements_ops capwap_element_wtpboarddata_ops = {
 };
 
 /* */
-struct capwap_wtpboarddata_board_subelement* capwap_wtpboarddata_get_subelement(struct capwap_wtpboarddata_element* wtpboarddata, int subelement) {
-	int i;
-
+struct capwap_wtpboarddata_board_subelement *
+capwap_wtpboarddata_get_subelement(struct capwap_wtpboarddata_element *wtpboarddata,
+				   int subelement)
+{
+	struct capwap_wtpboarddata_board_subelement *desc;
 	ASSERT(wtpboarddata != NULL);
-	ASSERT((subelement >= CAPWAP_BOARD_SUBELEMENT_TYPE_FIRST) && (subelement <= CAPWAP_BOARD_SUBELEMENT_TYPE_LAST));
+	ASSERT((subelement >= CAPWAP_BOARD_SUBELEMENT_TYPE_FIRST) &&
+	       (subelement <= CAPWAP_BOARD_SUBELEMENT_TYPE_LAST));
 
 	/* */
-	for (i = 0; i < wtpboarddata->boardsubelement->count; i++) {
-		struct capwap_wtpboarddata_board_subelement* desc = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(wtpboarddata->boardsubelement, i);
-
-		if (desc->type == subelement) {
+	cds_list_for_each_entry(desc, &wtpboarddata->boardsubelement, node) {
+		if (desc->type == subelement)
 			return desc;
-		}
 	}
 
 	return NULL;

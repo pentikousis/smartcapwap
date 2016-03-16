@@ -50,7 +50,7 @@ static int wtp_init(void) {
 	capwap_network_init(&g_wtp.net);
 
 	/* Standard configuration */
-	g_wtp.boarddata.boardsubelement = capwap_array_create(sizeof(struct capwap_wtpboarddata_board_subelement), 0, 1);
+	CDS_INIT_LIST_HEAD(&g_wtp.boarddata.boardsubelement);
 	CDS_INIT_LIST_HEAD(&g_wtp.descriptor.encryptsubelement);
 	CDS_INIT_LIST_HEAD(&g_wtp.descriptor.descsubelement);
 
@@ -88,9 +88,9 @@ static int wtp_init(void) {
 /* Destroy WTP */
 static void wtp_destroy(void)
 {
-	int i;
 	struct capwap_wtpdescriptor_encrypt_subelement *enc, *e;
 	struct capwap_wtpdescriptor_desc_subelement *desc, *d;
+	struct capwap_wtpboarddata_board_subelement *board, *b;
 
 	/* Dtls */
 	capwap_crypt_freecontext(&g_wtp.dtlscontext);
@@ -106,15 +106,10 @@ static void wtp_destroy(void)
 		capwap_free(desc);
 	}
 
-	for (i = 0; i < g_wtp.boarddata.boardsubelement->count; i++) {
-		struct capwap_wtpboarddata_board_subelement* element = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(g_wtp.boarddata.boardsubelement, i);
-
-		if (element->data) {
-			capwap_free(element->data);
-		}
+	cds_list_for_each_entry_safe(board, b, &g_wtp.boarddata.boardsubelement, node) {
+		cds_list_del(&board->node);
+		capwap_free(board);
 	}
-
-	capwap_array_free(g_wtp.boarddata.boardsubelement);
 
 	/* Free fragments packet */
 	capwap_list_free(g_wtp.requestfragmentpacket);
@@ -668,7 +663,8 @@ static int wtp_parsing_cfg_boardinfo_element(config_t *config)
 		config_setting_t *configElement;
 		const char *configName;
 		const char *configValue;
-		int lengthValue;
+		int length;
+		uint16_t type;
 		struct capwap_wtpboarddata_board_subelement *element;
 
 		configElement = config_setting_get_elem(configSetting, i);
@@ -685,30 +681,20 @@ static int wtp_parsing_cfg_boardinfo_element(config_t *config)
 			return 0;
 		}
 
-		lengthValue = strlen(configValue);
-		if (lengthValue >= CAPWAP_BOARD_SUBELEMENT_MAXDATA) {
+		length = strlen(configValue);
+		if (length >= CAPWAP_BOARD_SUBELEMENT_MAXDATA) {
 			capwap_logging_error("Invalid configuration file, application.boardinfo.element.value string length exceeded");
 			return 0;
 		}
 
-		element = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(g_wtp.boarddata.boardsubelement, g_wtp.boarddata.boardsubelement->count);
-
 		if (strcmp(configName, "model") == 0) {
-			element->type = CAPWAP_BOARD_SUBELEMENT_MODELNUMBER;
-			element->length = lengthValue;
-			element->data = (uint8_t*)capwap_clone((void*)configValue, lengthValue);
+			type = CAPWAP_BOARD_SUBELEMENT_MODELNUMBER;
 		} else if (strcmp(configName, "serial") == 0) {
-			element->type = CAPWAP_BOARD_SUBELEMENT_SERIALNUMBER;
-			element->length = lengthValue;
-			element->data = (uint8_t*)capwap_clone((void*)configValue, lengthValue);
+			type = CAPWAP_BOARD_SUBELEMENT_SERIALNUMBER;
 		} else if (strcmp(configName, "id") == 0) {
-			element->type = CAPWAP_BOARD_SUBELEMENT_ID;
-			element->length = lengthValue;
-			element->data = (uint8_t*)capwap_clone((void*)configValue, lengthValue);
+			type = CAPWAP_BOARD_SUBELEMENT_ID;
 		} else if (strcmp(configName, "revision") == 0) {
-			element->type = CAPWAP_BOARD_SUBELEMENT_REVISION;
-			element->length = lengthValue;
-			element->data = (uint8_t*)capwap_clone((void*)configValue, lengthValue);
+			type = CAPWAP_BOARD_SUBELEMENT_REVISION;
 		} else if (strcmp(configName, "macaddress") == 0) {
 			const char* configType;
 
@@ -721,14 +707,15 @@ static int wtp_parsing_cfg_boardinfo_element(config_t *config)
 				char macaddress[MACADDRESS_EUI64_LENGTH];
 
 				/* Retrieve macaddress */
-				element->type = CAPWAP_BOARD_SUBELEMENT_MACADDRESS;
-				element->length = capwap_get_macaddress_from_interface(configValue, macaddress);
-				if (!element->length || ((element->length != MACADDRESS_EUI64_LENGTH) && (element->length != MACADDRESS_EUI48_LENGTH))) {
+				type = CAPWAP_BOARD_SUBELEMENT_MACADDRESS;
+				length = capwap_get_macaddress_from_interface(configValue, macaddress);
+				if (length != MACADDRESS_EUI64_LENGTH &&
+				    length != MACADDRESS_EUI48_LENGTH) {
 					capwap_logging_error("Invalid configuration file, unable found macaddress of interface: '%s'", configValue);
 					return 0;
 				}
 
-				element->data = (uint8_t*)capwap_clone((void*)macaddress, element->length);
+				configValue = macaddress;
 			} else {
 				capwap_logging_error("Invalid configuration file, unknown application.boardinfo.element.type value");
 				return 0;
@@ -737,6 +724,12 @@ static int wtp_parsing_cfg_boardinfo_element(config_t *config)
 			capwap_logging_error("Invalid configuration file, unknown application.boardinfo.element.name value");
 			return 0;
 		}
+
+		element = capwap_alloc(sizeof(struct capwap_wtpboarddata_board_subelement) + length);
+		element->type = type;
+		element->length = length;
+		memcpy(element->data, configValue, length);
+		cds_list_add_tail(&element->node, &g_wtp.boarddata.boardsubelement);
 	}
 
 	return 1;

@@ -31,7 +31,6 @@ static int ac_dfa_state_join_check_authorizejoin(struct ac_session_t* session, s
 
 /* */
 static struct ac_soap_response* ac_dfa_state_join_parsing_request(struct ac_session_t* session, struct capwap_parsed_packet* packet) {
-	int i;
 	const char* jsonmessage;
 	char* base64confstatus;
 	struct json_object* jsonarray;
@@ -40,6 +39,7 @@ static struct ac_soap_response* ac_dfa_state_join_parsing_request(struct ac_sess
 	struct ac_soap_response* response;
 	struct capwap_location_element* location;
 	struct capwap_wtpboarddata_element* wtpboarddata;
+	struct capwap_wtpboarddata_board_subelement *wtpboarddata_board;
 	struct capwap_wtpdescriptor_element* wtpdescriptor;
 	struct capwap_wtpdescriptor_encrypt_subelement *wtpdescriptor_encrypt;
 	struct capwap_wtpdescriptor_desc_subelement *wtpdescriptor_desc;
@@ -150,11 +150,10 @@ static struct ac_soap_response* ac_dfa_state_join_parsing_request(struct ac_sess
 	json_object_object_add(jsonhash, "VendorIdentifier", json_object_new_int((int)wtpboarddata->vendor));
 
 	jsonarray = json_object_new_array();
-	for (i = 0; i < wtpboarddata->boardsubelement->count; i++) {
+	cds_list_for_each_entry(wtpboarddata_board, &wtpboarddata->boardsubelement, node) {
 		char* base64data;
 		int base64length;
 		struct json_object* jsonboard;
-		struct capwap_wtpboarddata_board_subelement* wtpboarddata_board = (struct capwap_wtpboarddata_board_subelement*)capwap_array_get_item_pointer(wtpboarddata->boardsubelement, i);
 
 		/* Encoded base64 board data */
 		base64data = (char*)capwap_alloc(AC_BASE64_ENCODE_LENGTH((int)wtpboarddata_board->length));

@@ -1,22 +1,22 @@
 # README
 
-[RFC-5415](https://tools.ietf.org/html/rfc5415) and [RFC-5416](https://tools.ietf.org/html/rfc5416) compliant CAPWAP WTP (and AC) implementation.
+According to RFC 5415, "the CAPWAP protocol, a standard, interoperable protocol that enables an Access Controller (AC) to manage a collection of Wireless Termination Points (WTPs)". Although the CAPWAP standard is not tied to any particular access technology, in many real-world deployments, WTPs are typically Wi-Fi access points implementing RFC 5416.
 
-This fork is currently focusing on the WTP side only.
+The [Travelping](http://travelping.com) smartcapwap fork implements a CAPWAP WTP and AC, compliant with [RFC 5415](https://datatracker.ietf.org/doc/rfc5415/) and [RFC 5416](https://datatracker.ietf.org/doc/rfc5416/).
 
 ## STATUS
 
-NOTE: The WTP has been ported to libev, the AC has not been adjusted and is therefor broken for the moment.
+NOTE: WTP has been ported to libev. AC has not and is therefore broken for the moment.
 
-### WTP tested and working features:
+### WTP Tested and Working Features
 
-* 802.11b
-* 802.11g
-* 802.11a
+* IEEE 802.11b/g/a/n
 * WMM/WME (mostly)
 * Local MAC
 * single radio, single WLAN mode
-* 802.11n ([draft-ietf-opsawg-capwap-extension-06](https://tools.ietf.org/html/draft-ietf-opsawg-capwap-extension-06))
+
+
+### Devices Tested
 
 Only cards with cfg80211 netlink API are supported. The following devices
 have been tested:
@@ -24,7 +24,7 @@ have been tested:
 * Atheros AR9280 (Compex WLE200NX)
 * Mediatek MT7602E, MT7612E (ZBT WG2626, ALL-WR1200AC_WRT)
 
-### Planned WTP features:
+### Planned WTP Features
 
 * encryption (WPA2)
 * Hybrid-MAC ([RFC-7494](https://tools.ietf.org/html/rfc7494))
@@ -33,9 +33,7 @@ have been tested:
 
 ### Requirements
 
-NOTE: To run WTP you must have a wireless card that has Linux driver based on the
-      Generic IEEE 802.11 Networking Stack (mac80211).
-
+NOTE: To run the smartcapwap WTP you must have a wireless card that has a Linux driver based on the Generic IEEE 802.11 Networking Stack (mac80211).
 * Linux 4.4 or newer
 * automake 1.9 or newer
 * autoconf
